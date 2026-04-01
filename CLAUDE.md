@@ -4,14 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Full-stack web application with a FastAPI Python backend, React/TypeScript frontend, and PostgreSQL database. Backend and frontend communicate via a generated OpenAPI client. All services run via Docker Compose.
+Full-stack AI agent application with a FastAPI Python backend, React/TypeScript frontend, PostgreSQL database, and Temporal for durable workflow orchestration. The core feature is an AI-powered support ticket system where Claude analyzes tickets via a multi-step Temporal workflow.
 
 ## Development Commands
 
 ### Start the Stack
 
 ```bash
-docker compose watch       # Development with live reload
+docker compose watch       # Development with live reload (recommended)
 docker compose up -d       # Production mode
 docker compose down -v     # Teardown with volume cleanup
 ```
@@ -22,13 +22,22 @@ Local services after startup:
 - Adminer (DB admin): http://localhost:8080
 - MailCatcher: http://localhost:1080
 - Traefik UI: http://localhost:8090
+- Temporal UI: http://localhost:8233
+
+### Temporal Worker (separate terminal — required for ticket processing)
+
+```bash
+cd backend
+uv run python -m app.worker
+```
+
+The worker must run as a separate process. It connects to Temporal at `localhost:7233`, registers `TicketWorkflow` and all activities, and polls the `ticket-processing` task queue.
 
 ### Backend
 
 ```bash
 cd backend
 uv sync                                              # Install dependencies
-source .venv/bin/activate                            # Activate virtualenv
 fastapi dev app/main.py                              # Run locally (with reload)
 bash ./scripts/test.sh                               # Run tests
 docker compose exec backend bash scripts/tests-start.sh  # Run tests in stack
@@ -62,7 +71,7 @@ Run after changing backend routes:
 bash ./scripts/generate-client.sh
 ```
 
-This is also triggered automatically by pre-commit hooks. The generated client lives in `frontend/src/client/`.
+Generated client lives in `frontend/src/client/`.
 
 ## Architecture
 
@@ -71,6 +80,9 @@ This is also triggered automatically by pre-commit hooks. The generated client l
 ```
 Browser → Traefik (proxy/SSL) → Frontend (React/Nginx) or Backend (FastAPI)
                                             Backend → PostgreSQL
+                                            Backend → Temporal Server
+                                            Worker  → Temporal Server
+                                            Worker  → Anthropic API
 ```
 
 In dev, the frontend dev server (Vite) proxies API calls to the backend at port 8000.
@@ -79,35 +91,69 @@ In dev, the frontend dev server (Vite) proxies API calls to the backend at port 
 
 - **`main.py`** — FastAPI app creation, middleware, CORS
 - **`api/main.py`** — API router aggregator (all routes under `/api/v1/`)
-- **`api/routes/`** — Endpoint handlers: `login`, `users`, `items`, `utils`, `private`
-- **`api/deps.py`** — Dependency injection (current user, DB session)
+- **`api/routes/`** — Endpoint handlers: `login`, `users`, `items`, `utils`, `tickets`
+- **`api/deps.py`** — Dependency injection (current user, DB session, Temporal client)
 - **`core/config.py`** — Pydantic settings (reads from environment)
-- **`core/security.py`** — JWT creation/verification, password hashing (Argon2/Bcrypt via pwdlib)
-- **`models.py`** — SQLModel models shared as both ORM and Pydantic schemas
-- **`crud.py`** — All database CRUD operations
+- **`core/security.py`** — JWT creation/verification, password hashing
+- **`models.py`** — SQLModel models: User, Item, Ticket, TicketAnalysis
+- **`crud.py`** — Database CRUD operations
+- **`worker.py`** — Temporal worker entry point (run separately)
 
-Authentication uses JWT bearer tokens with 8-day expiration, stored in the frontend's localStorage.
+### Temporal Layer (`backend/app/`)
+
+- **`workflows/ticket_workflow.py`** — Defines the 7-step pipeline and execution order
+- **`activities/ticket_activities.py`** — Implementations of each workflow step
+- **`agents/investigation_agent.py`** — Claude agentic loop using Anthropic SDK tool_runner
+- **`tools/ticket_tools.py`** — Tool implementations (knowledge base search, similar ticket lookup)
+
+### Ticket Workflow Pipeline
+
+```
+fetch_ticket → classify_ticket → decide_action
+  └─ if "investigate":
+       get_similar_tickets → run_investigation_agent → validate_result
+  └─ if "auto_resolve":
+       (skip to validate with canned response)
+→ update_ticket → respond_to_user
+```
+
+The workflow is defined in `ticket_workflow.py`. Activities in `ticket_activities.py` are just implementations — order is irrelevant there.
+
+### Investigation Agent
+
+Uses the **Anthropic SDK beta tool runner** (`@beta_tool` + `client.beta.messages.tool_runner()`). Tools are defined as decorated functions with closures — no hand-written JSON schemas or manual message loop.
+
+- Model: `claude-opus-4-6` for investigation, `claude-haiku-4-5` for classification
+- Tools: `search_knowledge_base`, `get_similar_tickets`, `submit_analysis`
+- The tool_runner is synchronous; called via `asyncio.to_thread` from the async Temporal activity
 
 ### Frontend (`frontend/src/`)
 
 - **`client/`** — Auto-generated Axios-based API client (do not edit manually)
 - **`routes/`** — TanStack Router pages; `_layout.tsx` wraps authenticated views
-- **`components/`** — Organized by domain (Admin, Items, UserSettings, Common); `ui/` contains shadcn/ui primitives
-- **`hooks/`** — Custom React hooks, typically wrapping TanStack Query mutations/queries
-
-Data fetching uses TanStack Query. Forms use React Hook Form + Zod validation.
+- **`routes/_layout/tickets.tsx`** — Ticket submission and live status polling
+- **`components/`** — Organized by domain; `ui/` contains shadcn/ui primitives
+- **`hooks/`** — Custom React hooks wrapping TanStack Query
 
 ### Data Models
 
-Two core entities defined in `backend/app/models.py`:
+Defined in `backend/app/models.py`:
 - **User** — id, email, hashed_password, is_active, is_superuser, full_name
 - **Item** — id, title, description, owner_id (FK to User)
-
-SQLModel means the same class serves as both the ORM model and Pydantic request/response schema (using table/non-table variants).
+- **Ticket** — id, title, description, status, owner_id, created_at
+- **TicketAnalysis** — ticket_id, summary, diagnosis, suggested_fix, priority, needs_human, confidence
 
 ### Configuration
 
-All configuration flows through `.env` → `backend/app/core/config.py` (Pydantic `Settings`). Key variables: `SECRET_KEY`, `POSTGRES_*`, `FIRST_SUPERUSER*`, `SMTP_*`, `SENTRY_DSN`.
+All configuration flows through `.env` → `backend/app/core/config.py`. Key variables:
+- `SECRET_KEY`, `POSTGRES_*`, `FIRST_SUPERUSER*`, `SMTP_*` — standard app config
+- `ANTHROPIC_API_KEY` — required for Claude API calls in the worker
+- `TEMPORAL_HOST` — defaults to `localhost:7233` (worker); overridden to `temporal:7233` for the backend container in `compose.override.yml`
+- `TEMPORAL_TASK_QUEUE` — defaults to `ticket-processing`
+
+### Important: docker compose watch vs worker
+
+`docker compose watch` auto-syncs Python file changes into the backend container — no restart needed for backend edits. The **worker** (local terminal) does NOT have watch — restart it manually after any Python change.
 
 ## Testing
 
@@ -120,7 +166,7 @@ All configuration flows through `.env` → `backend/app/core/config.py` (Pydanti
 Pre-commit hooks (configured in `.pre-commit-config.yaml`) run: Biome (frontend), Ruff (backend), MyPy (backend), and client generation. Install with:
 
 ```bash
-cd backend && uv run prek install -f
+cd backend && uv run pre-commit install -f
 ```
 
 MyPy runs in strict mode. Ruff enforces formatting and linting. Biome enforces frontend formatting/linting.
