@@ -1,5 +1,7 @@
+import enum
 import uuid
 from datetime import datetime, timezone
+from typing import Optional
 
 from pydantic import EmailStr
 from sqlalchemy import DateTime
@@ -127,3 +129,89 @@ class TokenPayload(SQLModel):
 class NewPassword(SQLModel):
     token: str
     new_password: str = Field(min_length=8, max_length=128)
+
+
+# ---------------------------------------------------------------------------
+# Ticket models
+# ---------------------------------------------------------------------------
+
+
+class TicketStatus(str, enum.Enum):
+    open = "open"
+    analyzing = "analyzing"
+    resolved = "resolved"
+    escalated = "escalated"
+
+
+class TicketPriority(str, enum.Enum):
+    low = "low"
+    medium = "medium"
+    high = "high"
+    critical = "critical"
+
+
+class TicketBase(SQLModel):
+    title: str = Field(min_length=1, max_length=255)
+    description: str = Field(min_length=1, max_length=5000)
+
+
+class TicketCreate(TicketBase):
+    pass
+
+
+# Response schemas — defined before DB models so TicketPublic can reference
+# TicketAnalysisPublic directly without a forward reference.
+class TicketAnalysisPublic(SQLModel):
+    summary: str
+    diagnosis: str
+    suggested_fix: str
+    priority: TicketPriority
+    needs_human: bool
+    confidence: float
+    created_at: datetime | None = None
+
+
+class TicketPublic(TicketBase):
+    id: uuid.UUID
+    status: TicketStatus
+    created_at: datetime | None = None
+    analysis: TicketAnalysisPublic | None = None
+
+
+class TicketsPublic(SQLModel):
+    data: list[TicketPublic]
+    count: int
+
+
+# DB models
+class Ticket(TicketBase, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    status: TicketStatus = Field(default=TicketStatus.open)
+    owner_id: uuid.UUID = Field(foreign_key="user.id", ondelete="CASCADE")
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    # Forward reference — TicketAnalysis is defined below
+    # Must use Optional["ClassName"] — SQLAlchemy can't parse "X | None" strings
+    analysis: Optional["TicketAnalysis"] = Relationship(
+        back_populates="ticket", cascade_delete=True
+    )
+
+
+class TicketAnalysis(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    ticket_id: uuid.UUID = Field(
+        foreign_key="ticket.id", unique=True, ondelete="CASCADE"
+    )
+    summary: str = Field(max_length=500)
+    diagnosis: str = Field(max_length=2000)
+    suggested_fix: str = Field(max_length=2000)
+    priority: TicketPriority
+    needs_human: bool
+    confidence: float
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    ticket: Ticket | None = Relationship(back_populates="analysis")
