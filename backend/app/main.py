@@ -1,5 +1,9 @@
+import logging
+
 import sentry_sdk
 from fastapi import FastAPI
+
+logging.basicConfig(level=logging.INFO)
 from fastapi.routing import APIRoute
 from starlette.middleware.cors import CORSMiddleware
 
