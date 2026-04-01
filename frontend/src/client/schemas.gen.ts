@@ -251,6 +251,150 @@ export const PrivateUserCreateSchema = {
     title: 'PrivateUserCreate'
 } as const;
 
+export const TicketAnalysisPublicSchema = {
+    properties: {
+        summary: {
+            type: 'string',
+            title: 'Summary'
+        },
+        diagnosis: {
+            type: 'string',
+            title: 'Diagnosis'
+        },
+        suggested_fix: {
+            type: 'string',
+            title: 'Suggested Fix'
+        },
+        priority: {
+            '$ref': '#/components/schemas/TicketPriority'
+        },
+        needs_human: {
+            type: 'boolean',
+            title: 'Needs Human'
+        },
+        confidence: {
+            type: 'number',
+            title: 'Confidence'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['summary', 'diagnosis', 'suggested_fix', 'priority', 'needs_human', 'confidence'],
+    title: 'TicketAnalysisPublic'
+} as const;
+
+export const TicketCreateSchema = {
+    properties: {
+        title: {
+            type: 'string',
+            maxLength: 255,
+            minLength: 1,
+            title: 'Title'
+        },
+        description: {
+            type: 'string',
+            maxLength: 5000,
+            minLength: 1,
+            title: 'Description'
+        }
+    },
+    type: 'object',
+    required: ['title', 'description'],
+    title: 'TicketCreate'
+} as const;
+
+export const TicketPrioritySchema = {
+    type: 'string',
+    enum: ['low', 'medium', 'high', 'critical'],
+    title: 'TicketPriority'
+} as const;
+
+export const TicketPublicSchema = {
+    properties: {
+        title: {
+            type: 'string',
+            maxLength: 255,
+            minLength: 1,
+            title: 'Title'
+        },
+        description: {
+            type: 'string',
+            maxLength: 5000,
+            minLength: 1,
+            title: 'Description'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        status: {
+            '$ref': '#/components/schemas/TicketStatus'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        analysis: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TicketAnalysisPublic'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    type: 'object',
+    required: ['title', 'description', 'id', 'status'],
+    title: 'TicketPublic'
+} as const;
+
+export const TicketStatusSchema = {
+    type: 'string',
+    enum: ['open', 'analyzing', 'resolved', 'escalated'],
+    title: 'TicketStatus'
+} as const;
+
+export const TicketsPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/TicketPublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'TicketsPublic'
+} as const;
+
 export const TokenSchema = {
     properties: {
         access_token: {

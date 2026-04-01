@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { ItemsReadItemsData, ItemsReadItemsResponse, ItemsCreateItemData, ItemsCreateItemResponse, ItemsReadItemData, ItemsReadItemResponse, ItemsUpdateItemData, ItemsUpdateItemResponse, ItemsDeleteItemData, ItemsDeleteItemResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginRecoverPasswordData, LoginRecoverPasswordResponse, LoginResetPasswordData, LoginResetPasswordResponse, LoginRecoverPasswordHtmlContentData, LoginRecoverPasswordHtmlContentResponse, PrivateCreateUserData, PrivateCreateUserResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse } from './types.gen';
+import type { ItemsReadItemsData, ItemsReadItemsResponse, ItemsCreateItemData, ItemsCreateItemResponse, ItemsReadItemData, ItemsReadItemResponse, ItemsUpdateItemData, ItemsUpdateItemResponse, ItemsDeleteItemData, ItemsDeleteItemResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginRecoverPasswordData, LoginRecoverPasswordResponse, LoginResetPasswordData, LoginResetPasswordResponse, LoginRecoverPasswordHtmlContentData, LoginRecoverPasswordHtmlContentResponse, PrivateCreateUserData, PrivateCreateUserResponse, TicketsReadTicketsData, TicketsReadTicketsResponse, TicketsCreateTicketData, TicketsCreateTicketResponse, TicketsReadTicketData, TicketsReadTicketResponse, TicketsDeleteTicketData, TicketsDeleteTicketResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse } from './types.gen';
 
 export class ItemsService {
     /**
@@ -228,6 +228,94 @@ export class PrivateService {
             url: '/api/v1/private/users/',
             body: data.requestBody,
             mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+}
+
+export class TicketsService {
+    /**
+     * Read Tickets
+     * List all tickets belonging to the current user.
+     * @param data The data for the request.
+     * @param data.skip
+     * @param data.limit
+     * @returns TicketsPublic Successful Response
+     * @throws ApiError
+     */
+    public static readTickets(data: TicketsReadTicketsData = {}): CancelablePromise<TicketsReadTicketsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/tickets/',
+            query: {
+                skip: data.skip,
+                limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Create Ticket
+     * Submit a new support ticket. Claude analyzes it in the background —
+     * poll GET /tickets/{id} until status changes from 'analyzing'.
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns TicketPublic Successful Response
+     * @throws ApiError
+     */
+    public static createTicket(data: TicketsCreateTicketData): CancelablePromise<TicketsCreateTicketResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/tickets/',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Read Ticket
+     * Get a single ticket with its AI analysis (once available).
+     * @param data The data for the request.
+     * @param data.id
+     * @returns TicketPublic Successful Response
+     * @throws ApiError
+     */
+    public static readTicket(data: TicketsReadTicketData): CancelablePromise<TicketsReadTicketResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/tickets/{id}',
+            path: {
+                id: data.id
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Delete Ticket
+     * Delete a ticket and its analysis.
+     * @param data The data for the request.
+     * @param data.id
+     * @returns Message Successful Response
+     * @throws ApiError
+     */
+    public static deleteTicket(data: TicketsDeleteTicketData): CancelablePromise<TicketsDeleteTicketResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/tickets/{id}',
+            path: {
+                id: data.id
+            },
             errors: {
                 422: 'Validation Error'
             }

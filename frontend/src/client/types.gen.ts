@@ -52,6 +52,39 @@ export type PrivateUserCreate = {
     is_verified?: boolean;
 };
 
+export type TicketAnalysisPublic = {
+    summary: string;
+    diagnosis: string;
+    suggested_fix: string;
+    priority: TicketPriority;
+    needs_human: boolean;
+    confidence: number;
+    created_at?: (string | null);
+};
+
+export type TicketCreate = {
+    title: string;
+    description: string;
+};
+
+export type TicketPriority = 'low' | 'medium' | 'high' | 'critical';
+
+export type TicketPublic = {
+    title: string;
+    description: string;
+    id: string;
+    status: TicketStatus;
+    created_at?: (string | null);
+    analysis?: (TicketAnalysisPublic | null);
+};
+
+export type TicketsPublic = {
+    data: Array<TicketPublic>;
+    count: number;
+};
+
+export type TicketStatus = 'open' | 'analyzing' | 'resolved' | 'escalated';
+
 export type Token = {
     access_token: string;
     token_type?: string;
@@ -176,6 +209,31 @@ export type PrivateCreateUserData = {
 };
 
 export type PrivateCreateUserResponse = (UserPublic);
+
+export type TicketsReadTicketsData = {
+    limit?: number;
+    skip?: number;
+};
+
+export type TicketsReadTicketsResponse = (TicketsPublic);
+
+export type TicketsCreateTicketData = {
+    requestBody: TicketCreate;
+};
+
+export type TicketsCreateTicketResponse = (TicketPublic);
+
+export type TicketsReadTicketData = {
+    id: string;
+};
+
+export type TicketsReadTicketResponse = (TicketPublic);
+
+export type TicketsDeleteTicketData = {
+    id: string;
+};
+
+export type TicketsDeleteTicketResponse = (Message);
 
 export type UsersReadUsersData = {
     limit?: number;
