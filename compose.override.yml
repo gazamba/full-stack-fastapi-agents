@@ -95,7 +95,7 @@ services:
       - "1025:1025"
 
   temporal-db:
-    image: postgres:13
+    image: postgres:18
     restart: "no"
     ports:
       - "5433:5432"
